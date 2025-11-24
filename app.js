@@ -5,7 +5,7 @@ const app = express();
 const port = process.env.PORT || 3000; 
 
 // !!! BURAYI KENDİ BİLGİLERİNİZLE DEĞİŞTİRİN !!!
-const DB_URI = 'mmongodb+srv://toshirobushido:<db_password>@cluster0.1latqp9.mongodb.net/?appName=Cluster0;
+const DB_URI = 'mmongodb+srv://toshirobushido:<Ot2s2dawz12c.>@cluster0.1latqp9.mongodb.net/?appName=Cluster0;
 
 
 // --- MONGODB BAĞLANTISI ---
