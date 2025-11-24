@@ -1,0 +1,39 @@
+<html>
+<head>
+    <title>Kayıt Düzenle</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 30px; background-color: #f4f4f9; }
+        .kutu { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); max-width: 400px; margin: 0 auto; }
+        input, select, button { width: 100%; padding: 10px; margin: 5px 0; box-sizing: border-box; }
+        button { background-color: #007bff; color: white; border: none; cursor: pointer; font-weight: bold; }
+        button:hover { background-color: #0056b3; }
+        h1 { text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="kutu">
+        <h1>Kayıt Düzenle</h1>
+        <form action="/guncelle" method="POST">
+            <input type="hidden" name="id" value="<%= kayit.id %>">
+
+            <label>Tarih:</label>
+            <input type="date" name="tarih" value="<%= kayit.tarih %>" required>
+
+            <label>Saat:</label>
+            <input type="time" name="saat" value="<%= kayit.saat %>" required>
+
+            <label>İşlem Türü:</label>
+            <select name="tur">
+                <option value="Su İçildi" <%= kayit.tur === "Su İçildi" ? "selected" : "" %>>Su Girişi (İçildi)</option>
+                <option value="İdrar Çıkışı" <%= kayit.tur === "İdrar Çıkışı" ? "selected" : "" %>>İdrar Çıkışı</option>
+            </select>
+
+            <label>Miktar (ml):</label>
+            <input type="number" name="miktar" value="<%= kayit.miktar %>" required>
+
+            <button type="submit">Güncelle ve Kaydet</button>
+            <a href="/" style="display:block; text-align:center; margin-top:10px;">Geri Dön</a>
+        </form>
+    </div>
+</body>
+</html>

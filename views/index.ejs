@@ -1,0 +1,105 @@
+<html>
+<head>
+    <title>Hasta Takip Uygulaması</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 30px; background-color: #f4f4f9; }
+        h1 { color: #333; text-align: center; }
+        .kutu { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); max-width: 800px; margin: 0 auto; }
+        input, select, button { width: 100%; padding: 10px; margin: 5px 0; box-sizing: border-box; }
+        button { background-color: #28a745; color: white; border: none; cursor: pointer; font-weight: bold; }
+        button:hover { background-color: #218838; }
+        table { width: 100%; margin-top: 20px; border-collapse: collapse; }
+        th, td { padding: 10px; border-bottom: 1px solid #ddd; text-align: left; }
+        th { background-color: #333; color: white; }
+        hr { border: 0; height: 1px; background-color: #ccc; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="kutu">
+        <h1>💧 Hasta Sıvı Takip Uygulaması</h1>
+        
+        <h3>Günlük Sıvı Dengesi Raporu</h3>
+        <table>
+            <tr><th>Tarih</th><th>Sıvı Girişi (ml)</th><th>Sıvı Çıkışı (ml)</th><th>Net Denge (ml)</th></tr>
+            
+            <% 
+            // app.js'ten gelen dailyBalance verisini burada kullanıyoruz
+            for (const tarih in dailyBalance) {
+                const giris = dailyBalance[tarih].giris;
+                const cikis = dailyBalance[tarih].cikis;
+                const net = giris - cikis;
+                const netRenk = net >= 0 ? 'color: green; font-weight: bold;' : 'color: red; font-weight: bold;';
+            %>
+                <tr>
+                    <td><%= tarih %></td>
+                    <td><%= giris %></td>
+                    <td><%= cikis %></td>
+                    <td style="<%= netRenk %>"><%= net %></td>
+                </tr>
+            <% } %>
+        </table>
+        <hr>
+
+        <h3>Yeni Kayıt Girişi</h3>
+        <form action="/kaydet" method="POST">
+            <label>Tarih ve Saat:</label>
+            <div style="display:flex; gap:10px;">
+                <input type="date" name="tarih" required>
+                <input type="time" name="saat" required>
+            </div>
+
+            <label>İşlem Türü:</label>
+            <select name="tur">
+                <option value="Su İçildi">Su Girişi (İçildi)</option>
+                <option value="İdrar Çıkışı">İdrar Çıkışı</option>
+            </select>
+
+            <label>Miktar (ml):</label>
+            <input type="number" name="miktar" placeholder="Örn: 200" required>
+
+            <button type="submit">Kaydet</button>
+        </form>
+
+        <hr>
+        <h3>Detaylı Kayıt Listesi</h3>
+        <div style="margin-bottom: 15px;">
+            <span style="font-weight: bold;">Sırala:</span>
+            <a href="/?sort=yeniden_eskiye" style="margin-left: 10px;">En Yeni Kayıtlar</a> | 
+            <a href="/?sort=eskiden_yeniye">En Eski Kayıtlar</a>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Tarih</th>
+                    <th>Saat</th>
+                    <th>Tür</th>
+                    <th>Miktar</th>
+                    <th>İşlem</th> 
+                </tr>
+            </thead>
+            <tbody>
+                <% 
+                // app.js'ten gelen kayitlar verisini burada döngüye sokuyoruz
+                kayitlar.forEach(kayit => {
+                    const renk = kayit.tur === "Su İçildi" ? "#e3f2fd" : "#fff9c4";
+                %>
+                    <tr style="background-color: <%= renk %>">
+                        <td><%= kayit.tarih %></td>
+                        <td><%= kayit.saat %></td>
+                        <td><%= kayit.tur %></td>
+                        <td><%= kayit.miktar %> ml</td>
+                        <td>
+                            <a href="/duzenle/<%= kayit.id %>" style="background-color: #ffc107; color: #333; padding: 5px 10px; border-radius: 3px; text-decoration: none; font-size: 14px; margin-right: 5px; display: inline-block;">Düzenle</a>
+                            
+                            <form action="/sil" method="POST" style="display:inline-block;">
+                                <input type="hidden" name="id" value="<%= kayit.id %>">
+                                <button type="submit" style="background-color: #dc3545; padding: 5px 10px; font-weight: normal; width: auto; font-size: 14px;">Sil</button>
+                            </form>
+                        </td>
+                    </tr>
+                <% }); %>
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
