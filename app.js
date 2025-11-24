@@ -1,39 +1,43 @@
 const express = require('express');
-const fs = require('fs');
+const mongoose = require('mongoose'); // Mongoose eklendi
 const app = express();
-const port = process.env.PORT || 3000;
-const DATA_FILE = 'kayitlar.json'; 
+// Render'ın dinamik portunu kullanır
+const port = process.env.PORT || 3000; 
 
-// --- YENİ EKLENEN YAPILANDIRMA (Aynı Kaldı) ---
+// !!! BURAYI KENDİ BİLGİLERİNİZLE DEĞİŞTİRİN !!!
+const DB_URI = 'mmongodb+srv://toshirobushido:<db_password>@cluster0.1latqp9.mongodb.net/?appName=Cluster0;
+
+
+// --- MONGODB BAĞLANTISI ---
+mongoose.connect(DB_URI)
+    .then(() => console.log('MongoDB Bağlantısı Başarılı!'))
+    .catch(err => console.error('MongoDB Bağlantı Hatası:', err));
+
+
+// --- KAYIT ŞEMASI (MODEL) ---
+const kayitSchema = new mongoose.Schema({
+    tarih: String,
+    saat: String,
+    tur: String,
+    miktar: Number,
+});
+
+const Kayit = mongoose.model('Kayit', kayitSchema);
+
+
+// --- KODUN DİĞER BÖLÜMLERİ ---
 app.set('view engine', 'ejs');
 app.set('views', './views'); 
-// ---------------------------------
-
 app.use(express.urlencoded({ extended: true }));
 
-// --- DOSYA İŞLEMLERİ (Aynı Kaldı) ---
-function loadKayitlar() {
-    try {
-        const data = fs.readFileSync(DATA_FILE, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        return [];
-    }
-}
 
-function saveKayitlar() {
-    const data = JSON.stringify(kayitlar, null, 2); 
-    fs.writeFileSync(DATA_FILE, data, 'utf8');
-}
-
-let kayitlar = loadKayitlar(); 
-
-// --- SIVI DENGE ANALİZ FONKSİYONU (Aynı Kaldı) ---
+// --- SIVI DENGE ANALİZ FONKSİYONU (Aynı kaldı) ---
 function calculateDailyBalance(records) {
     const dailyData = {};
     records.forEach(kayit => {
         const tarih = kayit.tarih;
-        const miktar = parseInt(kayit.miktar);
+        // Kayıtlar artık JSON değil, Mongoose objesi olduğu için parseInt'e gerek yok
+        const miktar = kayit.miktar; 
         const tur = kayit.tur;
         if (!dailyData[tarih]) {
             dailyData[tarih] = { giris: 0, cikis: 0 };
@@ -47,77 +51,88 @@ function calculateDailyBalance(records) {
     return dailyData;
 }
 
+
 // --- SUNUCU YOLLARI (ROUTES) ---
 
-// 1. Anasayfayı gösterme (SIRALAMA MANTIĞI EKLENDİ)
-app.get('/', (req, res) => {
-    
-    // YENİ: URL'den 'sort' parametresini al
+// 1. Anasayfayı gösterme (ASYNC yapıldı)
+app.get('/', async (req, res) => { 
     const siralamaTuru = req.query.sort;
-
-    // Ana kayıt listesinin bir kopyası üzerinde çalış (orijinali bozmamak için)
-    let siralayiciKayitlar = [...kayitlar]; 
     
-    // Sıralama mantığı:
+    // Veritabanından verileri çek
+    let siralayiciKayitlar = await Kayit.find().lean(); 
+
+    // Sıralama mantığı (MongoDB _id'sine göre sıralanır)
     if (siralamaTuru === 'eskiden_yeniye') {
-        // ID'si küçük olan (eskiden girilen) öne gelir
-        siralayiciKayitlar.sort((a, b) => a.id - b.id);
+        // En eski kayıtlar öne
+        siralayiciKayitlar.sort((a, b) => a._id.getTimestamp() - b._id.getTimestamp());
     } else if (siralamaTuru === 'yeniden_eskiye' || !siralamaTuru) {
-        // Varsayılan olarak ID'si büyük olan (yeniden girilen) öne gelir
-        siralayiciKayitlar.sort((a, b) => b.id - a.id);
+        // En yeni kayıtlar öne (Varsayılan)
+        siralayiciKayitlar.sort((a, b) => b._id.getTimestamp() - a._id.getTimestamp());
     } 
-    // Not: Farklı sıralama türleri de eklenebilir (örn: miktara göre)
 
-    const dailyBalance = calculateDailyBalance(kayitlar);
-    
-    // Sıralanmış listeyi EJS'ye gönder
+    const dailyBalance = calculateDailyBalance(siralayiciKayitlar);
+
     res.render('index', { 
         kayitlar: siralayiciKayitlar, 
         dailyBalance: dailyBalance 
     });
 });
 
-// 2, 3, 4, 5. Diğer rotalar (Kaydet, Sil, Düzenle, Güncelle) aynı kaldı
-app.post('/kaydet', (req, res) => {
-    kayitlar.push({
-        id: Date.now(),
+// 2. KAYDETME İŞLEMİ (ASYNC yapıldı)
+app.post('/kaydet', async (req, res) => { 
+    const yeniKayit = new Kayit({ 
         tarih: req.body.tarih,
         saat: req.body.saat,
         tur: req.body.tur,
-        miktar: req.body.miktar
+        miktar: parseInt(req.body.miktar)
     });
-    saveKayitlar();
-    res.redirect('/');
+
+    try {
+        await yeniKayit.save(); 
+        res.redirect('/');
+    } catch (err) {
+        console.error(err);
+        res.send('Kaydetme hatası oluştu!');
+    }
 });
 
-app.post('/sil', (req, res) => {
-    const silinecekId = parseInt(req.body.id); 
-    kayitlar = kayitlar.filter(kayit => kayit.id !== silinecekId);
-    saveKayitlar(); 
-    res.redirect('/'); 
+// 3. SİLME İŞLEMİ (ASYNC yapıldı)
+app.post('/sil', async (req, res) => { 
+    const silinecekId = req.body.id; 
+    try {
+        await Kayit.findByIdAndDelete(silinecekId); 
+        res.redirect('/');
+    } catch (err) {
+        console.error(err);
+        res.send('Silme hatası oluştu!');
+    }
 });
 
-app.get('/duzenle/:id', (req, res) => {
-    const kayitId = parseInt(req.params.id); 
-    const kayit = kayitlar.find(k => k.id === kayitId);
+// 4. DÜZENLEME SAYFASINI GÖSTERME (ASYNC yapıldı)
+app.get('/duzenle/:id', async (req, res) => { 
+    const kayitId = req.params.id; 
+    const kayit = await Kayit.findById(kayitId).lean(); 
     if (!kayit) return res.send("Kayıt bulunamadı!");
     res.render('edit', { kayit: kayit });
 });
 
-app.post('/guncelle', (req, res) => {
-    const guncellenecekId = parseInt(req.body.id);
-    const index = kayitlar.findIndex(kayit => kayit.id === guncellenecekId);
-    if (index !== -1) {
-        kayitlar[index] = {
-            id: guncellenecekId,
-            tarih: req.body.tarih,
-            saat: req.body.saat,
-            tur: req.body.tur,
-            miktar: req.body.miktar
-        };
-        saveKayitlar();
+// 5. GÜNCELLEME İŞLEMİ (ASYNC yapıldı)
+app.post('/guncelle', async (req, res) => { 
+    const guncellenecekId = req.body.id;
+    const guncellenenVeri = {
+        tarih: req.body.tarih,
+        saat: req.body.saat,
+        tur: req.body.tur,
+        miktar: parseInt(req.body.miktar)
+    };
+    
+    try {
+        await Kayit.findByIdAndUpdate(guncellenecekId, guncellenenVeri); 
+        res.redirect('/');
+    } catch (err) {
+        console.error(err);
+        res.send('Güncelleme hatası oluştu!');
     }
-    res.redirect('/');
 });
 
 
